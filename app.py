@@ -124,7 +124,7 @@ if pagina == "Formulario":
         with col1:
             anonima = st.checkbox("Participación anónima")
             nombre = st.text_input("Nombre", disabled=anonima)
-            rol = st.selectbox("Rol", ["Profesora", "Egresada", "Otra"])
+            rol = st.selectbox("Rol", ["Profesora", "Egresada", "Profesora y egresada"])
 
         with col2:
             institucion = st.text_input("Institución (opcional)")
