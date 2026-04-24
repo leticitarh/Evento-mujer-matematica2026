@@ -5,95 +5,172 @@ from datetime import datetime
 import re
 from collections import Counter
 
-# Configuración de página
-st.set_page_config(page_title="Entre dudas y decisiones", page_icon="∫", layout="wide")
+# ============================================================
+# CONFIGURACIÓN
+# ============================================================
 
-# Ruta del archivo
+st.set_page_config(
+    page_title="Entre dudas y decisiones",
+    page_icon="∫",
+    layout="wide"
+)
+
 DATA_PATH = Path("respuestas_evento_mujer_matematica.csv")
 
-# Preguntas
+# ============================================================
+# PREGUNTAS COMPLETAS
+# ============================================================
+
 PREGUNTAS = {
     "decision_clave": "¿Qué decisión marcó un antes y un después en tu trayectoria?",
-    "como_decidiste": "¿Cómo tomaste esa decisión?",
-    "duda": "¿En qué momento dudaste de continuar?",
-    "que_te_ayudo": "¿Qué te ayudó a seguir?",
-    "obstaculo": "¿Qué obstáculo enfrentaste?",
-    "afrontamiento": "¿Cómo lo afrontaste?",
+    "como_decidiste": "¿Cómo tomaste esa decisión? ¿Qué factores consideraste?",
+    "duda": "¿En qué momento dudaste de continuar en matemáticas y por qué?",
+    "que_te_ayudo": "¿Qué te ayudó a seguir o a redefinir tu camino?",
+    "obstaculo": "¿Qué obstáculo significativo enfrentaste en tu formación o ejercicio profesional?",
+    "afrontamiento": "¿Cómo lo afrontaste o qué aprendiste de esa experiencia?",
+    "error_formativo": "¿Hay alguna decisión que no haya resultado como esperabas? ¿Qué aprendiste de ello?",
+    "trayectoria": "¿Tu camino profesional ha sido distinto a lo que imaginabas? ¿En qué sentido?",
+    "criterio": "¿Qué criterio o principio utilizas hoy para tomar decisiones importantes?",
+    "saber_estudiante": "¿Qué te hubiera gustado saber cuando eras estudiante?"
 }
 
-# -----------------------------
-# Funciones
-# -----------------------------
+COLUMNAS = [
+    "timestamp", "nombre", "anonima", "rol", "institucion",
+    *PREGUNTAS.keys(),
+    "consentimiento"
+]
+
+# ============================================================
+# FUNCIONES
+# ============================================================
 
 def inicializar_csv():
     if not DATA_PATH.exists():
-        columnas = ["timestamp", "nombre", "rol"] + list(PREGUNTAS.keys())
-        pd.DataFrame(columns=columnas).to_csv(DATA_PATH, index=False)
+        pd.DataFrame(columns=COLUMNAS).to_csv(DATA_PATH, index=False, encoding="utf-8-sig")
 
 def cargar_datos():
     inicializar_csv()
-    return pd.read_csv(DATA_PATH)
+    return pd.read_csv(DATA_PATH, encoding="utf-8-sig")
 
-def guardar_respuesta(data):
+def guardar_respuesta(respuesta):
     df = cargar_datos()
-    df = pd.concat([df, pd.DataFrame([data])], ignore_index=True)
-    df.to_csv(DATA_PATH, index=False)
+    df = pd.concat([df, pd.DataFrame([respuesta])], ignore_index=True)
+    df.to_csv(DATA_PATH, index=False, encoding="utf-8-sig")
 
-def contar_palabras(series):
+def limpiar_texto(texto):
+    if pd.isna(texto):
+        return ""
+    texto = str(texto).lower()
+    texto = re.sub(r"[^a-záéíóúüñ\s]", " ", texto)
+    return texto
+
+def contar_palabras(series, top_n=20):
     texto = " ".join(series)
-    palabras = re.findall(r"\w+", texto.lower())
-    return pd.DataFrame(Counter(palabras).most_common(20), columns=["palabra", "frecuencia"])
+    palabras = [p for p in texto.split() if len(p) > 3]
+    return pd.DataFrame(Counter(palabras).most_common(top_n), columns=["palabra", "frecuencia"])
 
-# -----------------------------
-# Navegación
-# -----------------------------
+# ============================================================
+# ESTILO (OCRES)
+# ============================================================
+
+st.markdown("""
+<style>
+.main-title {
+    font-size: 2.3rem;
+    font-weight: 700;
+    color: #3d3329;
+}
+.subtitle {
+    color: #6b5b4a;
+    margin-bottom: 1.5rem;
+}
+.box {
+    background-color: #f5efe4;
+    padding: 1rem;
+    border-left: 5px solid #a87332;
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# MENÚ
+# ============================================================
 
 st.sidebar.title("Menú")
 pagina = st.sidebar.radio("Sección", ["Formulario", "Dashboard", "Exportar"])
 
-# -----------------------------
+# ============================================================
 # FORMULARIO
-# -----------------------------
+# ============================================================
 
 if pagina == "Formulario":
-    st.title("Entre dudas y decisiones: ser mujer matemática")
-    st.subheader("Formulario para profesoras y egresadas")
 
-    with st.form("form"):
-        nombre = st.text_input("Nombre (opcional)")
-        rol = st.selectbox("Rol", ["Profesora", "Egresada", "Profesora y egresada"])
+    st.markdown('<div class="main-title">Entre dudas y decisiones: ser mujer matemática</div>', unsafe_allow_html=True)
+    st.markdown('<div class="subtitle">Experiencias que orientan trayectorias</div>', unsafe_allow_html=True)
+
+    st.markdown("""
+    <div class="box">
+    La participación puede ser anónima. Si compartes una experiencia adversa,
+    acompáñala con un aprendizaje o estrategia que pueda orientar a otras estudiantes.
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.form("formulario", clear_on_submit=True):
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            anonima = st.checkbox("Participación anónima")
+            nombre = st.text_input("Nombre", disabled=anonima)
+            rol = st.selectbox("Rol", ["Profesora", "Egresada", "Otra"])
+
+        with col2:
+            institucion = st.text_input("Institución (opcional)")
+
+        st.divider()
+        st.subheader("Preguntas guía")
 
         respuestas = {}
-        for key, pregunta in PREGUNTAS.items():
-            respuestas[key] = st.text_area(pregunta)
+        for k, pregunta in PREGUNTAS.items():
+            respuestas[k] = st.text_area(pregunta)
+
+        consentimiento = st.checkbox("Autorizo el uso del testimonio")
 
         enviar = st.form_submit_button("Enviar")
 
         if enviar:
-            data = {
-                "timestamp": datetime.now(),
-                "nombre": nombre,
-                "rol": rol,
-                **respuestas
-            }
-            guardar_respuesta(data)
-            st.success("Tu respuesta fue guardada correctamente")
+            if not consentimiento:
+                st.error("Debes aceptar el consentimiento")
+            else:
+                guardar_respuesta({
+                    "timestamp": datetime.now(),
+                    "nombre": "Anónimo" if anonima else nombre,
+                    "anonima": anonima,
+                    "rol": rol,
+                    "institucion": institucion,
+                    **respuestas,
+                    "consentimiento": consentimiento
+                })
+                st.success("Respuesta guardada")
 
-# -----------------------------
-# DASHBOARD
-# -----------------------------
+# ============================================================
+# DASHBOARD (CORREGIDO)
+# ============================================================
 
 elif pagina == "Dashboard":
-    st.title("Dashboard de respuestas")
+
+    st.markdown('<div class="main-title">Dashboard</div>', unsafe_allow_html=True)
 
     df = cargar_datos()
 
     if df.empty:
-        st.info("Aún no hay respuestas")
+        st.info("Sin respuestas aún")
     else:
         st.metric("Total de respuestas", len(df))
 
-        # Texto combinado (CORREGIDO)
+        # 🔴 AQUÍ ESTABA EL ERROR → YA CORREGIDO
         texto_series = df[list(PREGUNTAS.keys())] \
             .fillna("") \
             .astype(str) \
@@ -101,27 +178,29 @@ elif pagina == "Dashboard":
 
         palabras_df = contar_palabras(texto_series)
 
-        st.subheader("Palabras más frecuentes")
+        st.subheader("Palabras frecuentes")
         st.bar_chart(palabras_df.set_index("palabra"))
 
-        st.subheader("Respuestas completas")
+        st.subheader("Respuestas")
         st.dataframe(df)
 
-# -----------------------------
+# ============================================================
 # EXPORTAR
-# -----------------------------
+# ============================================================
 
 elif pagina == "Exportar":
-    st.title("Exportar datos")
+
+    st.markdown('<div class="main-title">Exportar datos</div>', unsafe_allow_html=True)
 
     df = cargar_datos()
 
     if df.empty:
-        st.info("No hay datos para descargar")
+        st.info("No hay datos")
     else:
-        csv = df.to_csv(index=False)
+        csv = df.to_csv(index=False, encoding="utf-8-sig")
+
         st.download_button(
-            label="Descargar CSV",
+            "Descargar CSV",
             data=csv,
             file_name="respuestas_evento.csv",
             mime="text/csv"
