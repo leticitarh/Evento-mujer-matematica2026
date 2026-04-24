@@ -61,7 +61,7 @@ if pagina == "Formulario":
 
     with st.form("form"):
         nombre = st.text_input("Nombre (opcional)")
-        rol = st.selectbox("Rol", ["Profesora", "Egresada", "Otra"])
+        rol = st.selectbox("Rol", ["Profesora", "Egresada", "Profesora y egresada"])
 
         respuestas = {}
         for key, pregunta in PREGUNTAS.items():
